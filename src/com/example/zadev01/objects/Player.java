@@ -26,19 +26,6 @@ public class Player extends GameObject {
     // ===========================================================
     public Player(final float pX, final float pY, final TiledTextureRegion pTiledTextureRegion, final VertexBufferObjectManager pVertexBufferObjectManager, Pusher mPusher) {
         super(pX, pY, pTiledTextureRegion, pVertexBufferObjectManager, mPusher);
-    	this.mPusher.mLocalChannels.get("test_channel").bind("player:coop:update2",new PusherCallback() {
-			@Override
-	        public void onEvent(String eventName, JSONObject eventData, String channelName) {    
-					try {
-						Player.this.angle = eventData.getInt("angle");
-						Player.this.setX((float)eventData.getDouble("px"));
-						Player.this.setY((float)eventData.getDouble("py"));
-					} catch (JSONException e) {
-						// TODO Auto-generated catch block
-						Player.this.angle= 0;
-					}
-			}
-		});
     }
  
     // ===========================================================

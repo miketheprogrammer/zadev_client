@@ -28,10 +28,6 @@ public abstract class GameObject extends AnimatedSprite {
  
     public GameObject(final float pX, final float pY, final ITiledTextureRegion pTiledTextureRegion, final VertexBufferObjectManager pVertexBufferObjectManager, Pusher p) {
         super(pX, pY, pTiledTextureRegion, pVertexBufferObjectManager);
-        this.mPhysicsHandler = new PhysicsHandler(this);
-        this.registerUpdateHandler(this.mPhysicsHandler);
-        this.mPusher = p;
-        this.velocity = 0;
     }
  
     // ===========================================================
@@ -41,13 +37,6 @@ public abstract class GameObject extends AnimatedSprite {
     // ===========================================================
     // Methods for/from SuperClass/Interfaces
     // ===========================================================
- 
-	@Override
-    protected void onManagedUpdate(float pSecondsElapsed) {
-        move();
- 
-        super.onManagedUpdate(pSecondsElapsed);
-    }
  
     // ===========================================================
     // Methods

@@ -90,8 +90,8 @@ public class ZAMainActivity extends SimpleBaseGameActivity implements IAccelerat
  
     private Camera mCamera;
     private Scene mScene;
-    public Player oPlayer;
-    public Player other;
+    public AnimatedSprite g_player;
+    public AnimatedSprite g_other;
     
 	private TiledTextureRegion mBoxFaceTextureRegion;
 	private TiledTextureRegion mCircleFaceTextureRegion;
@@ -159,12 +159,13 @@ public class ZAMainActivity extends SimpleBaseGameActivity implements IAccelerat
 		PhysicsFactory.createBoxBody(this.mPhysicsWorld, roof, BodyType.StaticBody, wallFixtureDef);
 		PhysicsFactory.createBoxBody(this.mPhysicsWorld, left, BodyType.StaticBody, wallFixtureDef);
 		PhysicsFactory.createBoxBody(this.mPhysicsWorld, right, BodyType.StaticBody, wallFixtureDef);
-
+		
 		this.mScene.attachChild(ground);
 		this.mScene.attachChild(roof);
 		this.mScene.attachChild(left);
 		this.mScene.attachChild(right);
-
+		this.g_player = this.addFace(100f, 100f);
+		this.g_other = this.addFace(200f, 250f);
 		this.mScene.registerUpdateHandler(this.mPhysicsWorld);
 
 		this.mScene.setOnAreaTouchListener(this);
@@ -227,7 +228,7 @@ public class ZAMainActivity extends SimpleBaseGameActivity implements IAccelerat
 	// Methods
 	// ===========================================================
 
-	private void addFace(final float pX, final float pY) {
+	private AnimatedSprite addFace(final float pX, final float pY) {
 		this.mFaceCount++;
 
 		final AnimatedSprite face;
@@ -249,6 +250,8 @@ public class ZAMainActivity extends SimpleBaseGameActivity implements IAccelerat
 		face.setUserData(body);
 		this.mScene.registerTouchArea(face);
 		this.mScene.attachChild(face);
+		
+		return face;
 	}
 
 	private void jumpFace(final AnimatedSprite face) {
