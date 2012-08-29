@@ -8,11 +8,13 @@ import org.andengine.engine.options.EngineOptions;
 import org.andengine.engine.options.ScreenOrientation;
 import org.andengine.engine.options.resolutionpolicy.RatioResolutionPolicy;
 import org.andengine.entity.IEntityMatcher;
+import org.andengine.entity.primitive.Rectangle;
 import org.andengine.entity.scene.IOnAreaTouchListener;
 import org.andengine.entity.scene.IOnSceneTouchListener;
 import org.andengine.entity.scene.ITouchArea;
 import org.andengine.entity.scene.Scene;
 import org.andengine.entity.scene.background.Background;
+import org.andengine.entity.sprite.AnimatedSprite;
 import org.andengine.entity.sprite.Sprite;
 import org.andengine.entity.util.FPSLogger;
 import org.andengine.input.sensor.acceleration.AccelerationData;
@@ -22,16 +24,33 @@ import org.andengine.opengl.texture.atlas.bitmap.BitmapTextureAtlas;
 import org.andengine.opengl.texture.atlas.bitmap.BitmapTextureAtlasTextureRegionFactory;
 import org.andengine.opengl.texture.region.TextureRegion;
 import org.andengine.opengl.texture.region.TiledTextureRegion;
+import org.andengine.opengl.vbo.VertexBufferObjectManager;
 import org.andengine.ui.activity.SimpleBaseGameActivity;
 import org.apache.http.client.ClientProtocolException;
 import org.json.JSONObject;
+import org.andengine.extension.physics.box2d.PhysicsConnector;
+import org.andengine.extension.physics.box2d.PhysicsFactory;
+import org.andengine.extension.physics.box2d.PhysicsWorld;
+import org.andengine.extension.physics.box2d.util.Vector2Pool;
+import org.andengine.opengl.texture.TextureOptions;
 
+import android.hardware.SensorManager;
+import android.widget.Toast;
+
+import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.physics.box2d.Body;
+import com.badlogic.gdx.physics.box2d.BodyDef.BodyType;
+import com.badlogic.gdx.physics.box2d.FixtureDef;
+import android.hardware.SensorManager;
 import android.util.FloatMath;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
+import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.physics.box2d.FixtureDef;
+import com.badlogic.gdx.physics.box2d.BodyDef.BodyType;
 import com.emorym.android_pusher.Pusher;
 import com.emorym.android_pusher.PusherCallback;
 import com.example.zadev01.objects.Player;
@@ -73,6 +92,16 @@ public class ZAMainActivity extends SimpleBaseGameActivity implements IAccelerat
     private Scene mMainScene;
     public Player oPlayer;
     public Player other;
+    
+	private TiledTextureRegion mBoxFaceTextureRegion;
+	private TiledTextureRegion mCircleFaceTextureRegion;
+
+	private int mFaceCount = 0;
+
+	private PhysicsWorld mPhysicsWorld;
+
+	private float mGravityX;
+	private float mGravityY;
     // ====================================
     // Textures
     // ==============
@@ -109,9 +138,15 @@ public class ZAMainActivity extends SimpleBaseGameActivity implements IAccelerat
     @Override
     protected void onCreateResources() {
         // Load all the textures this game needs.
-        this.mBitmapTextureAtlas = new BitmapTextureAtlas(this.getTextureManager(), 32, 32);
-        this.mPlayerTiledTextureRegion = BitmapTextureAtlasTextureRegionFactory.createTiledFromAsset(this.mBitmapTextureAtlas, this, "face_box.png", 0, 0, 1, 1);
-        this.mBitmapTextureAtlas.load();
+        //this.mBitmapTextureAtlas = new BitmapTextureAtlas(this.getTextureManager(), 32, 32);
+        //this.mPlayerTiledTextureRegion = BitmapTextureAtlasTextureRegionFactory.createTiledFromAsset(this.mBitmapTextureAtlas, this, "face_box.png", 0, 0, 1, 1);
+        //this.mBitmapTextureAtlas.load();
+		//BitmapTextureAtlasTextureRegionFactory.setAssetBasePath("gfx/");
+
+		this.mBitmapTextureAtlas = new BitmapTextureAtlas(this.getTextureManager(), 64, 64, TextureOptions.BILINEAR);
+		this.mBoxFaceTextureRegion = BitmapTextureAtlasTextureRegionFactory.createTiledFromAsset(this.mBitmapTextureAtlas, this, "face_box_tiled.png", 0, 0, 2, 1); // 64x32
+		this.mCircleFaceTextureRegion = BitmapTextureAtlasTextureRegionFactory.createTiledFromAsset(this.mBitmapTextureAtlas, this, "face_circle_tiled.png", 0, 32, 2, 1); // 64x32
+		this.mBitmapTextureAtlas.load();
     }
  
     @Override
@@ -125,12 +160,36 @@ public class ZAMainActivity extends SimpleBaseGameActivity implements IAccelerat
         this.mMainScene.setOnSceneTouchListener(this);
 
         // Centre the player on the camera.
-        final float centerX = (CAMERA_WIDTH - this.mPlayerTiledTextureRegion.getWidth()) / 2;
-        final float centerY = (CAMERA_HEIGHT - this.mPlayerTiledTextureRegion.getHeight()) / 2;
- 
+        //final float centerX = (CAMERA_WIDTH - this.mPlayerTiledTextureRegion.getWidth()) / 2;
+        //final float centerY = (CAMERA_HEIGHT - this.mPlayerTiledTextureRegion.getHeight()) / 2;
+		this.mEngine.registerUpdateHandler(new FPSLogger());
+
+		this.mPhysicsWorld = new PhysicsWorld(new Vector2(0, SensorManager.GRAVITY_EARTH), false);
+
+		final VertexBufferObjectManager vertexBufferObjectManager = this.getVertexBufferObjectManager();
+		final Rectangle ground = new Rectangle(0, CAMERA_HEIGHT - 2, CAMERA_WIDTH, 2, vertexBufferObjectManager);
+		final Rectangle roof = new Rectangle(0, 0, CAMERA_WIDTH, 2, vertexBufferObjectManager);
+		final Rectangle left = new Rectangle(0, 0, 2, CAMERA_HEIGHT, vertexBufferObjectManager);
+		final Rectangle right = new Rectangle(CAMERA_WIDTH - 2, 0, 2, CAMERA_HEIGHT, vertexBufferObjectManager);
+
+		final FixtureDef wallFixtureDef = PhysicsFactory.createFixtureDef(0, 0.5f, 0.5f);
+		PhysicsFactory.createBoxBody(this.mPhysicsWorld, ground, BodyType.StaticBody, wallFixtureDef);
+		PhysicsFactory.createBoxBody(this.mPhysicsWorld, roof, BodyType.StaticBody, wallFixtureDef);
+		PhysicsFactory.createBoxBody(this.mPhysicsWorld, left, BodyType.StaticBody, wallFixtureDef);
+		PhysicsFactory.createBoxBody(this.mPhysicsWorld, right, BodyType.StaticBody, wallFixtureDef);
+
+		this.mMainScene.attachChild(ground);
+		this.mMainScene.attachChild(roof);
+		this.mMainScene.attachChild(left);
+		this.mMainScene.attachChild(right);
+
+		this.mMainScene.registerUpdateHandler(this.mPhysicsWorld);
+		this.mMainScene.setOnAreaTouchListener(this);
+
+
         // Create the sprite and add it to the scene.
-        final Player oPlayer = new Player(centerX, centerY, this.mPlayerTiledTextureRegion, this.getVertexBufferObjectManager(), this.mPusher);
-        final Player other = new Player(centerX, centerY, this.mPlayerTiledTextureRegion, this.getVertexBufferObjectManager(), this.mPusher);
+        //final Player oPlayer = new Player(centerX, centerY, this.mBoxFaceTextureRegion, this.getVertexBufferObjectManager(), this.mPusher);
+        //final Player other = new Player(centerX, centerY, this.mBoxFaceTextureRegion, this.getVertexBufferObjectManager(), this.mPusher);
         
         this.oPlayer = oPlayer; 
         this.other = other;
@@ -139,56 +198,42 @@ public class ZAMainActivity extends SimpleBaseGameActivity implements IAccelerat
         
         return this.mMainScene;
     }
-    @Override
-    public boolean onSceneTouchEvent(final Scene pScene, final TouchEvent pSceneTouchEvent) {
-    	final float x = pSceneTouchEvent.getX();
-    	final float y = pSceneTouchEvent.getY();
-    	/*float offx = (float) (x - this.oPlayer.getX());
-    	float offy = (float) (y - this.oPlayer.getY());
-    	if (offx <= 0)
-    		return false;
-    	
-    	float realx = (float) (this.mCamera.getWidth() + this.oPlayer.getWidth() / 2.0f);
-    	float ratio = (float) offy / (float) offx;
-    	
-    	final float distanceX = Math.abs(x - this.oPlayer.getX());
-    	final float distanceY = Math.abs(y - this.oPlayer.getY());
-    	final float distance = Math.min((float) Math.hypot(
-    			(double) distanceX, (double) distanceY), Math.abs(800-this.oPlayer.getX()));
-    	final double angleX = x - this.oPlayer.getX();
+	@Override
+	public boolean onAreaTouched( final TouchEvent pSceneTouchEvent, final ITouchArea pTouchArea,final float pTouchAreaLocalX, final float pTouchAreaLocalY) {
+		if(pSceneTouchEvent.isActionDown()) {
+			final AnimatedSprite face = (AnimatedSprite) pTouchArea;
+			this.jumpFace(face);
+			return true;
+		}
 
-    	final double angleY = y - this.oPlayer.getY();
-    	final float angle = (float) Math.toDegrees(Math.atan2(angleY,
+		return false;
+	}
 
-    			angleX))
-
-    			+ ANGLE_CONSTANT;*/
-    	float boxX = this.oPlayer.getX(); 
-    	float boxY = this.oPlayer.getY();
-
-    	// v2 user touch
-    	float touchX = pSceneTouchEvent.getX();
-    	float touchY = pSceneTouchEvent.getY();     
-
-    	float theta = (float) (180.0 / Math.PI * Math.atan2(touchY - boxY, touchX - boxX ));
-
-    	this.oPlayer.angle = theta + (float)-90.00;
-    	//this.oPlayer.setX(x);
-    	//this.oPlayer.setY(y);
-    	
-    	//this.oPlayer.velocity = - 500;
-    	ZAMainActivity.this.runOnUiThread(new Runnable() {
-			@Override
-			public void run() {
-				// TODO Auto-generated method stub
-				Toast.makeText(ZAMainActivity.this,
-						   "x:" + String.valueOf(x) + "y:" + String.valueOf(y) ,
-						   Toast.LENGTH_LONG).show();
+	@Override
+	public boolean onSceneTouchEvent(final Scene pScene, final TouchEvent pSceneTouchEvent) {
+		if(this.mPhysicsWorld != null) {
+			if(pSceneTouchEvent.isActionDown()) {
+				this.addFace(pSceneTouchEvent.getX(), pSceneTouchEvent.getY());
+				return true;
 			}
-		
-        });
-    	return true;
-    }
+		}
+		return false;
+	}
+
+	@Override
+	public void onAccelerationAccuracyChanged(final AccelerationData pAccelerationData) {
+
+	}
+
+	@Override
+	public void onAccelerationChanged(final AccelerationData pAccelerationData) {
+		this.mGravityX = pAccelerationData.getX();
+		this.mGravityY = pAccelerationData.getY();
+
+		final Vector2 gravity = Vector2Pool.obtain(this.mGravityX, this.mGravityY);
+		this.mPhysicsWorld.setGravity(gravity);
+		Vector2Pool.recycle(gravity);
+	}
 
     protected void initializePusher(){
     	this.mPusher = new Pusher(PUSHER_APP_KEY, PUSHER_APP_SECRET);
@@ -228,20 +273,49 @@ public class ZAMainActivity extends SimpleBaseGameActivity implements IAccelerat
     	
     }
 	@Override
-	public boolean onAreaTouched(TouchEvent pSceneTouchEvent,
-			ITouchArea pTouchArea, float pTouchAreaLocalX,
-			float pTouchAreaLocalY) {
-		// TODO Auto-generated method stub
-		return false;
+	public void onResumeGame() {
+		super.onResumeGame();
+
+		this.enableAccelerationSensor(this);
 	}
+
 	@Override
-	public void onAccelerationAccuracyChanged(AccelerationData pAccelerationData) {
-		// TODO Auto-generated method stub
-		
+	public void onPauseGame() {
+		super.onPauseGame();
+
+		this.disableAccelerationSensor();
 	}
-	@Override
-	public void onAccelerationChanged(AccelerationData pAccelerationData) {
-		// TODO Auto-generated method stub
-		
+	
+	private void addFace(final float pX, final float pY) {
+		this.mFaceCount++;
+
+		final AnimatedSprite face;
+		final Body body;
+
+		final FixtureDef objectFixtureDef = PhysicsFactory.createFixtureDef(1, 0.5f, 0.5f);
+
+		if(this.mFaceCount % 2 == 1){
+			face = new AnimatedSprite(pX, pY, this.mBoxFaceTextureRegion, this.getVertexBufferObjectManager());
+			body = PhysicsFactory.createBoxBody(this.mPhysicsWorld, face, BodyType.DynamicBody, objectFixtureDef);
+		} else {
+			face = new AnimatedSprite(pX, pY, this.mCircleFaceTextureRegion, this.getVertexBufferObjectManager());
+			body = PhysicsFactory.createCircleBody(this.mPhysicsWorld, face, BodyType.DynamicBody, objectFixtureDef);
+		}
+
+		this.mPhysicsWorld.registerPhysicsConnector(new PhysicsConnector(face, body, true, true));
+
+		face.animate(new long[]{200,200}, 0, 1, true);
+		face.setUserData(body);
+		this.mMainScene.registerTouchArea(face);
+		this.mMainScene.attachChild(face);
 	}
+
+	private void jumpFace(final AnimatedSprite face) {
+		final Body faceBody = (Body)face.getUserData();
+
+		final Vector2 velocity = Vector2Pool.obtain(this.mGravityX * -50, this.mGravityY * -50);
+		faceBody.setLinearVelocity(velocity);
+		Vector2Pool.recycle(velocity);
+	}
+
 }
