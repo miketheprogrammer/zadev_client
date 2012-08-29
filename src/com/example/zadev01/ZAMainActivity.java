@@ -187,10 +187,45 @@ public class ZAMainActivity extends SimpleBaseGameActivity implements IAccelerat
 	@Override
 	public boolean onSceneTouchEvent(final Scene pScene, final TouchEvent pSceneTouchEvent) {
 		if(this.mPhysicsWorld != null) {
-			if(pSceneTouchEvent.isActionDown()) {
-				this.addFace(pSceneTouchEvent.getX(), pSceneTouchEvent.getY());
-				return true;
-			}
+	    	final float x = pSceneTouchEvent.getX();
+	    	final float y = pSceneTouchEvent.getY();
+	    	/*float offx = (float) (x - this.oPlayer.getX());
+	    	float offy = (float) (y - this.oPlayer.getY());
+	    	if (offx <= 0)
+	    		return false;
+	    	
+	    	float realx = (float) (this.mCamera.getWidth() + this.oPlayer.getWidth() / 2.0f);
+	    	float ratio = (float) offy / (float) offx;
+	    	
+	    	final float distanceX = Math.abs(x - this.oPlayer.getX());
+	    	final float distanceY = Math.abs(y - this.oPlayer.getY());
+	    	final float distance = Math.min((float) Math.hypot(
+	    			(double) distanceX, (double) distanceY), Math.abs(800-this.oPlayer.getX()));
+	    	final double angleX = x - this.oPlayer.getX();
+
+	    	final double angleY = y - this.oPlayer.getY();
+	    	final float angle = (float) Math.toDegrees(Math.atan2(angleY,
+
+	    			angleX))
+
+	    			+ ANGLE_CONSTANT;*/
+	    	float boxX = this.g_player.getX(); 
+	    	float boxY = this.g_player.getY();
+
+	    	// v2 user touch
+	    	float touchX = pSceneTouchEvent.getX();
+	    	float touchY = pSceneTouchEvent.getY();     
+
+	    	float theta = (float) (180.0 / Math.PI * Math.atan2(touchY - boxY, touchX - boxX ));
+
+	    	theta = theta + (float)-90.00;
+	    	
+	    	final Body faceBody = (Body)this.g_player.getUserData();
+	    	
+			final Vector2 velocity = Vector2Pool.obtain((float)0.000 - (float)Math.sin(Math.toRadians(theta))*(float)10.00, (float)Math.cos(Math.toRadians(theta))*(float)10.00);
+			faceBody.setLinearVelocity(velocity);
+			Vector2Pool.recycle(velocity);
+
 		}
 		return false;
 	}
